@@ -193,63 +193,13 @@ The application is built on a modular, object-oriented architecture, emphasizing
 ## 4. Design Patterns Implementation
 
 ### 4.1 Singleton Pattern (ScheduleManager)
-```java
-public class ScheduleManager {
-    private static ScheduleManager instance;
-    private List<Task> tasks;
-    
-    private ScheduleManager() {
-        tasks = new ArrayList<>();
-    }
-    
-    public static synchronized ScheduleManager getInstance() {
-        if (instance == null) {
-            instance = new ScheduleManager();
-        }
-        return instance;
-    }
-    
-    // Other methods...
-}
-```
+
 
 ### 4.2 Factory Pattern (TaskFactory)
-```java
-public class TaskFactory {
-    public static Task createTask(String description, LocalTime start, LocalTime end, Priority priority) {
-        // Input validation
-        if (description == null || description.trim().isEmpty()) {
-            throw new IllegalArgumentException("Description cannot be empty");
-        }
-        // More validations...
-        
-        return new Task(description, start, end, priority);
-    }
-}
-```
+
 
 ### 4.3 Observer Pattern (ScheduleObserver)
-```java
-public interface ScheduleObserver {
-    void update(String message);
-}
 
-public class ScheduleManager {
-    private List<ScheduleObserver> observers = new ArrayList<>();
-    
-    public void addObserver(ScheduleObserver observer) {
-        observers.add(observer);
-    }
-    
-    private void notifyObservers(String message) {
-        for (ScheduleObserver observer : observers) {
-            observer.update(message);
-        }
-    }
-    
-    // Other methods...
-}
-```
 
 ## 5. SOLID Principles Adherence
 
