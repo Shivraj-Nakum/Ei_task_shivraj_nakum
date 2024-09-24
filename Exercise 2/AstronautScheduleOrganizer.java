@@ -1,239 +1,168 @@
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.logging.Logger;
+import java.util.Scanner;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
-// Singleton ScheduleManager
-class ScheduleManager {
-    private static ScheduleManager instance;
-    private List<Task> tasks;
-    private List<ScheduleObserver> observers;
-    private static final Logger logger = Logger.getLogger(ScheduleManager.class.getName());
-
-    private ScheduleManager() {
-        tasks = new ArrayList<>();
-        observers = new ArrayList<>();
-    }
-
-    public static synchronized ScheduleManager getInstance() {
-        if (instance == null) {
-            instance = new ScheduleManager();
-        }
-        return instance;
-    }
-
-    public void addTask(Task task) throws TaskConflictException {
-        for (Task existingTask : tasks) {
-            if (task.conflicts(existingTask)) {
-                String errorMessage = "Task conflicts with existing task: " + existingTask.getDescription();
-                logger.log(Level.WARNING, errorMessage);
-                throw new TaskConflictException(errorMessage);
-            }
-        }
-        tasks.add(task);
-        tasks.sort(Comparator.comparing(Task::getStartTime));
-        notifyObservers("Task added: " + task.getDescription());
-        logger.log(Level.INFO, "Task added: " + task.getDescription());
-    }
-
-    public void removeTask(String description) throws TaskNotFoundException {
-        boolean removed = tasks.removeIf(task -> task.getDescription().equals(description));
-        if (!removed) {
-            String errorMessage = "Task not found: " + description;
-            logger.log(Level.WARNING, errorMessage);
-            throw new TaskNotFoundException(errorMessage);
-        }
-        notifyObservers("Task removed: " + description);
-        logger.log(Level.INFO, "Task removed: " + description);
-    }
-
-    public List<Task> viewTasks() {
-        return new ArrayList<>(tasks);
-    }
-
-    public void addObserver(ScheduleObserver observer) {
-        observers.add(observer);
-    }
-
-    public void removeObserver(ScheduleObserver observer) {
-        observers.remove(observer);
-    }
-
-    private void notifyObservers(String message) {
-        for (ScheduleObserver observer : observers) {
-            observer.update(message);
-        }
-    }
-}
-
-// Task class
-class Task {
-    private String description;
-    private LocalTime startTime;
-    private LocalTime endTime;
-    private Priority priority;
-
-    public Task(String description, LocalTime startTime, LocalTime endTime, Priority priority) {
-        this.description = description;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.priority = priority;
-    }
-
-    public boolean conflicts(Task other) {
-        return (this.startTime.isBefore(other.endTime) && other.startTime.isBefore(this.endTime));
-    }
-
-    // Getters
-    public String getDescription() { return description; }
-    public LocalTime getStartTime() { return startTime; }
-    public LocalTime getEndTime() { return endTime; }
-    public Priority getPriority() { return priority; }
-
-    @Override
-    public String toString() {
-        return String.format("%s - %s: %s [%s]", 
-            startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-            endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-            description, priority);
-    }
-}
-
-// TaskFactory for creating Task objects
-class TaskFactory {
-    public static Task createTask(String description, String startTime, String endTime, String priority) 
-            throws IllegalArgumentException {
-        try {
-            LocalTime start = LocalTime.parse(startTime);
-            LocalTime end = LocalTime.parse(endTime);
-            Priority prio = Priority.valueOf(priority.toUpperCase());
-            return new Task(description, start, end, prio);
-        } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Invalid time format. Use HH:mm.");
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid priority level. Use LOW, MEDIUM, or HIGH.");
-        }
-    }
-}
-
-// Priority enum
-enum Priority {
-    LOW, MEDIUM, HIGH
-}
-
-// Observer interface
-interface ScheduleObserver {
-    void update(String message);
-}
-
-// Custom exceptions
-class TaskConflictException extends Exception {
-    public TaskConflictException(String message) {
-        super(message);
-    }
-}
-
-class TaskNotFoundException extends Exception {
-    public TaskNotFoundException(String message) {
-        super(message);
-    }
-}
-
-// Main application class
 public class AstronautScheduleOrganizer {
+    // Logger for logging application events and errors
     private static final Logger logger = Logger.getLogger(AstronautScheduleOrganizer.class.getName());
+    // Scanner for user input
     private static final Scanner scanner = new Scanner(System.in);
+    // Singleton instance of ScheduleManager to manage tasks
     private static final ScheduleManager scheduleManager = ScheduleManager.getInstance();
 
     public static void main(String[] args) {
+        // Load configuration settings from the properties file
+        ConfigurationManager.loadConfiguration("config.properties");
+        // Add an observer to notify when tasks change
         scheduleManager.addObserver(message -> System.out.println("Notification: " + message));
 
-        while (true) {
+        boolean running = true; // Flag to control the main loop
+        while (running) {
             try {
-                displayMenu();
-                int choice = Integer.parseInt(scanner.nextLine());
-                processChoice(choice);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Please enter a number.");
-                logger.log(Level.WARNING, "Invalid menu input", e);
+                displayMenu(); // Display the main menu options
+                // Get user input for menu choice
+                int choice = InputValidator.getIntInput(scanner, "Enter your choice: ", 1, 7);
+                // Process the user's choice and determine if the application should keep running
+                running = processChoice(choice);
             } catch (Exception e) {
+                // Handle unexpected errors and log them
                 System.out.println("An error occurred: " + e.getMessage());
                 logger.log(Level.SEVERE, "Unexpected error", e);
             }
         }
     }
 
+    // Display the main menu options to the user
     private static void displayMenu() {
         System.out.println("\nAstronaut Daily Schedule Organizer");
         System.out.println("1. Add Task");
         System.out.println("2. Remove Task");
         System.out.println("3. View Tasks");
-        System.out.println("4. Exit");
-        System.out.print("Enter your choice: ");
+        System.out.println("4. Edit Task");
+        System.out.println("5. Mark Task as Completed");
+        System.out.println("6. View Tasks by Priority");
+        System.out.println("7. Exit");
     }
 
-    private static void processChoice(int choice) throws Exception {
+    // Process the user's menu choice and execute corresponding actions
+    private static boolean processChoice(int choice) throws Exception {
         switch (choice) {
             case 1:
-                addTask();
+                addTask(); // Add a new task
                 break;
             case 2:
-                removeTask();
+                removeTask(); // Remove an existing task
                 break;
             case 3:
-                viewTasks();
+                viewTasks(); // View all tasks
                 break;
             case 4:
-                System.out.println("Exiting the application.");
-                System.exit(0);
+                editTask(); // Edit an existing task
+                break;
+            case 5:
+                markTaskAsCompleted(); // Mark a task as completed
+                break;
+            case 6:
+                viewTasksByPriority(); // View tasks by priority
+                break;
+            case 7:
+                System.out.println("Exiting the application."); // Exit the application
+                return false; // Stop the main loop
             default:
-                System.out.println("Invalid choice. Please try again.");
+                System.out.println("Invalid choice. Please try again."); // Handle invalid choice
         }
+        return true; // Continue running the application
     }
 
+    // Add a new task to the schedule
     private static void addTask() {
         try {
-            System.out.print("Enter task description: ");
-            String description = scanner.nextLine();
-            System.out.print("Enter start time (HH:mm): ");
-            String startTime = scanner.nextLine();
-            System.out.print("Enter end time (HH:mm): ");
-            String endTime = scanner.nextLine();
-            System.out.print("Enter priority (LOW/MEDIUM/HIGH): ");
-            String priority = scanner.nextLine();
+            // Get task details from the user
+            String description = InputValidator.getStringInput(scanner, "Enter task description: ");
+            String startTime = InputValidator.getTimeInput(scanner, "Enter start time (HH:mm): ");
+            String endTime = InputValidator.getTimeInput(scanner, "Enter end time (HH:mm): ");
+            String priority = InputValidator.getPriorityInput(scanner, "Enter priority (LOW/MEDIUM/HIGH): ");
 
+            // Create a new task and add it to the schedule
             Task task = TaskFactory.createTask(description, startTime, endTime, priority);
             scheduleManager.addTask(task);
             System.out.println("Task added successfully.");
         } catch (IllegalArgumentException | TaskConflictException e) {
+            // Handle errors related to task creation and log them
             System.out.println("Error: " + e.getMessage());
             logger.log(Level.WARNING, "Error adding task", e);
         }
     }
 
+    // Remove an existing task from the schedule
     private static void removeTask() {
-        System.out.print("Enter task description to remove: ");
-        String description = scanner.nextLine();
+        String description = InputValidator.getStringInput(scanner, "Enter task description to remove: ");
         try {
+            // Remove the task from the schedule
             scheduleManager.removeTask(description);
             System.out.println("Task removed successfully.");
         } catch (TaskNotFoundException e) {
+            // Handle errors related to task removal and log them
             System.out.println("Error: " + e.getMessage());
             logger.log(Level.WARNING, "Error removing task", e);
         }
     }
 
+    // View all tasks in the schedule
     private static void viewTasks() {
-        List<Task> tasks = scheduleManager.viewTasks();
-        if (tasks.isEmpty()) {
-            System.out.println("No tasks scheduled for the day.");
-        } else {
-            System.out.println("Scheduled tasks:");
-            for (Task task : tasks) {
-                System.out.println(task);
-            }
+        scheduleManager.viewTasks().forEach(System.out::println); // Print each task
+    }
+
+    // Edit an existing task's details
+    private static void editTask() {
+        String description = InputValidator.getStringInput(scanner, "Enter task description to edit: ");
+        try {
+            // Get the current task and display its details
+            Task task = scheduleManager.getTask(description);
+            System.out.println("Current task details: " + task);
+            
+            // Get new details for the task, allowing empty input to keep current values
+            String newDescription = InputValidator.getStringInput(scanner, "Enter new description (press enter to keep current): ");
+            String newStartTime = InputValidator.getTimeInput(scanner, "Enter new start time (HH:mm, press enter to keep current): ");
+            String newEndTime = InputValidator.getTimeInput(scanner, "Enter new end time (HH:mm, press enter to keep current): ");
+            String newPriority = InputValidator.getPriorityInput(scanner, "Enter new priority (LOW/MEDIUM/HIGH, press enter to keep current): ");
+
+            // Create an updated task with the new details
+            Task updatedTask = TaskFactory.createTask(
+                newDescription.isEmpty() ? task.getDescription() : newDescription,
+                newStartTime.isEmpty() ? task.getStartTime().toString() : newStartTime,
+                newEndTime.isEmpty() ? task.getEndTime().toString() : newEndTime,
+                newPriority.isEmpty() ? task.getPriority().toString() : newPriority
+            );
+
+            // Update the task in the schedule
+            scheduleManager.editTask(description, updatedTask);
+            System.out.println("Task updated successfully.");
+        } catch (TaskNotFoundException | TaskConflictException e) {
+            // Handle errors related to task editing and log them
+            System.out.println("Error: " + e.getMessage());
+            logger.log(Level.WARNING, "Error editing task", e);
         }
+    }
+
+    // Mark a task as completed
+    private static void markTaskAsCompleted() {
+        String description = InputValidator.getStringInput(scanner, "Enter task description to mark as completed: ");
+        try {
+            // Mark the specified task as completed
+            scheduleManager.markTaskAsCompleted(description);
+            System.out.println("Task marked as completed successfully.");
+        } catch (TaskNotFoundException e) {
+            // Handle errors related to marking tasks and log them
+            System.out.println("Error: " + e.getMessage());
+            logger.log(Level.WARNING, "Error marking task as completed", e);
+        }
+    }
+
+    // View tasks filtered by priority level
+    private static void viewTasksByPriority() {
+        String priority = InputValidator.getPriorityInput(scanner, "Enter priority level to view (LOW/MEDIUM/HIGH): ");
+        // Print tasks that match the specified priority level
+        scheduleManager.viewTasksByPriority(Priority.valueOf(priority.toUpperCase())).forEach(System.out::println);
     }
 }
