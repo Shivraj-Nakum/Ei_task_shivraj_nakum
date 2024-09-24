@@ -1,4 +1,4 @@
-# Comprehensive Software Documentation
+# Task Documentation
 
 ## Table of Contents
 - [Part 1: Design Patterns Showcase](#part-1-design-patterns-showcase)
@@ -112,7 +112,7 @@ This section demonstrates the practical implementation of various design pattern
 
 ---
 
-# Part 2: Astronaut Daily Schedule Organizer
+# Part 2: Astronaut Daily Schedule Organizer 🚀
 
 ## 1. Introduction
 
