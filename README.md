@@ -217,7 +217,10 @@ The application is built on a modular, object-oriented architecture, emphasizing
 1. Add Task
 2. Remove Task
 3. View Tasks
-4. Exit
+4. Edit Task
+5. Mark Task as Completed
+6. View Tasks by Priority
+7. Exit
 Enter your choice:
 ```
 
@@ -265,7 +268,7 @@ try {
 
 ## 8. Performance Optimizations
 
-- **Efficient Data Structures**: Utilizes TreeSet for O(log n) task insertion and retrieval
+- **Efficient Data Structures**: Utilizes ConcurrentSkipListSet for O(log n) task insertion and retrieval
 - **Lazy Initialization**: ScheduleManager instance created only when first requested
 - **Optimized Conflict Detection**: Implements binary search for faster conflict checking
 
